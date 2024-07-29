@@ -2,12 +2,13 @@ mod bitflag;
 mod enumeration;
 mod string;
 
-use heck::ToSnakeCase;
+use heck::{ToPascalCase, ToShoutySnakeCase, ToSnakeCase};
+
 use proc_macro2::Span;
 use proc_macro_error::abort_call_site;
 use quote::{format_ident, quote};
 use std::collections::{HashMap, HashSet};
-use syn::Ident;
+use syn::{spanned::Spanned, Ident};
 
 use std::fmt::Write;
 
@@ -336,14 +337,11 @@ impl Context {
 /// and [`StaticVariantType`](gio::glib::variant::StaticVariantType).
 ///
 /// The input names are converted to pascal case
-fn new_variant_enum(
+pub(crate) fn enum_token_stream(
     name: &str,
     variants: &[(&str, Option<i32>)],
     visibility: syn::Visibility,
 ) -> proc_macro2::TokenStream {
-    use heck::ToPascalCase;
-    use syn::spanned::Spanned;
-
     let variant_names = variants
         .iter()
         .map(|(variant_name, _)| variant_name)
@@ -420,6 +418,108 @@ fn new_variant_enum(
                 match self {
                     #(#to_variant_arms),*
                 }
+            }
+        }
+
+        impl std::convert::From<#ident> for gio::glib::Variant {
+            fn from(this: #ident) -> gio::glib::Variant {
+                gio::glib::variant::ToVariant::to_variant(&this)
+            }
+        }
+    }
+}
+
+pub(crate) fn type_name_from_id(id: &str) -> String {
+    id.split('.')
+        .last()
+        .map(|part| part.to_pascal_case())
+        .unwrap_or(id.to_string())
+}
+
+pub(crate) fn bitflag_token_stream(
+    name: &str,
+    flag: &SchemaFlag,
+    visibility: syn::Visibility,
+) -> proc_macro2::TokenStream {
+    let value_idents = flag
+        .values
+        .iter()
+        .map(|value| Ident::new(&value.nick.to_shouty_snake_case(), value.nick.span()))
+        .collect::<Vec<_>>();
+
+    let flags_arms = value_idents
+        .iter()
+        .zip(flag.values.iter())
+        .map(|(value_ident, value)| {
+            let value = value.value;
+            quote! {
+                const #value_ident = #value;
+            }
+        });
+
+    let from_variant_arms =
+        value_idents
+            .iter()
+            .zip(flag.values.iter())
+            .map(|(value_ident, value)| {
+                let nick = &value.nick;
+                quote! {
+                    #nick => this.insert(Self::#value_ident)
+                }
+            });
+
+    let to_variant_arms =
+        value_idents
+            .iter()
+            .zip(flag.values.iter())
+            .map(|(value_ident, value)| {
+                let nick = &value.nick;
+                quote! {
+                    if self.contains(Self::#value_ident) {
+                        string_array.push(#nick)
+                    }
+                }
+            });
+
+    let name_pascal_case = name.to_pascal_case();
+    let ident = Ident::new(&name_pascal_case, name_pascal_case.span());
+
+    quote! {
+        gio::glib::bitflags::bitflags! {
+            #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+            #visibility struct #ident: u32 {
+                #(#flags_arms)*
+            }
+        }
+
+        impl gio::glib::variant::StaticVariantType for #ident {
+            fn static_variant_type() -> std::borrow::Cow<'static, gio::glib::VariantTy> {
+                std::borrow::Cow::Borrowed(gio::glib::VariantTy::STRING_ARRAY)
+            }
+        }
+
+        impl gio::glib::variant::FromVariant for #ident {
+            fn from_variant(variant: &gio::glib::Variant) -> Option<Self> {
+                let mut this = Self::empty();
+
+                for string in variant.get::<Vec<String>>()? {
+                    match string.as_str() {
+                        #(#from_variant_arms),*,
+                        _ => return None,
+                    }
+                }
+
+                Some(this)
+            }
+        }
+
+        impl gio::glib::variant::ToVariant for #ident {
+            fn to_variant(&self) -> gio::glib::Variant {
+                let mut string_array = Vec::new();
+
+                #(#to_variant_arms)*
+
+                gio::glib::variant::ToVariant::to_variant(&string_array)
             }
         }
 

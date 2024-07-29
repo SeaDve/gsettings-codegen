@@ -42,7 +42,7 @@ pub struct FlagValues {
     pub value: u32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Schema {
     #[serde(rename = "@id")]
     pub id: String,
@@ -50,7 +50,7 @@ pub struct Schema {
     pub keys: Vec<Key>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Key {
     #[serde(rename = "@name")]
     pub name: String,
@@ -95,19 +95,19 @@ impl Key {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Choice {
     #[serde(rename = "@value")]
     pub value: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Choices {
     #[serde(rename = "choice")]
     pub choices: Vec<Choice>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Range {
     #[serde(rename = "@max")]
     pub max: Option<String>,

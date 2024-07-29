@@ -500,3 +500,126 @@ fn private_struct() {
     // use inner::Settings;
     // use inner::SpaceStyle;
 }
+
+#[test]
+#[serial_test::serial]
+fn multiple_schemas() {
+    setup_schema();
+
+    #[gen_settings(
+        file = "tests/io.github.seadve.test.multi.gschema.xml",
+        id = "io.github.seadve.test.multi"
+    )]
+    #[gen_settings_skip(signature = "(ss)")]
+    #[gen_settings_skip(signature = "ay")]
+    pub struct Settings;
+
+    let settings = Settings::default();
+
+    settings.set_theme("dark");
+    assert_eq!(settings.theme(), "dark");
+
+    settings.set_invalid_words(&["invalid", "words"]);
+    assert_eq!(settings.invalid_words(), vec!["invalid", "words"]);
+
+    settings.set_volume(1.0);
+    assert_eq!(settings.volume(), 1.0);
+
+    settings.set_preferred_audio_source(PreferredAudioSource::DesktopAudio);
+    assert_eq!(
+        settings.preferred_audio_source(),
+        PreferredAudioSource::DesktopAudio
+    );
+
+    settings.set_dimensions((20, 20));
+    assert_eq!(settings.dimensions(), (20, 20));
+
+    #[gen_settings(
+        file = "tests/io.github.seadve.test.multi.gschema.xml",
+        id = "io.github.seadve.test.multi.window-state",
+        globals = false
+    )]
+    pub struct WindowStateSettings;
+    let window_settings = WindowStateSettings::default();
+
+    window_settings.set_is_maximized(true);
+    assert!(window_settings.is_maximized());
+
+    window_settings.set_window_width(30_000);
+    assert_eq!(window_settings.window_width(), 30_000);
+
+    window_settings.set_window_height(30_000);
+    assert_eq!(window_settings.window_height(), 30_000);
+
+    window_settings.set_window_width_64(30_000);
+    assert_eq!(window_settings.window_width_64(), 30_000);
+
+    window_settings.set_window_height_64(30_000);
+    assert_eq!(window_settings.window_height_64(), 30_000);
+}
+
+#[test]
+#[serial_test::serial]
+fn multiple_schemas_no_default() {
+    setup_schema();
+
+    #[gen_settings(
+        file = "tests/io.github.seadve.test.multi.gschema.xml",
+        id = "io.github.seadve.test.multi",
+        default
+    )]
+    #[gen_settings_skip(signature = "(ss)")]
+    #[gen_settings_skip(signature = "ay")]
+    pub struct Settings;
+
+    let settings = Settings::default();
+
+    settings.set_theme("dark");
+    assert_eq!(settings.theme(), "dark");
+
+    settings.set_invalid_words(&["invalid", "words"]);
+    assert_eq!(settings.invalid_words(), vec!["invalid", "words"]);
+
+    settings.set_volume(1.0);
+    assert_eq!(settings.volume(), 1.0);
+
+    settings.set_preferred_audio_source(PreferredAudioSource::DesktopAudio);
+    assert_eq!(
+        settings.preferred_audio_source(),
+        PreferredAudioSource::DesktopAudio
+    );
+
+    settings.set_dimensions((20, 20));
+    assert_eq!(settings.dimensions(), (20, 20));
+
+    #[gen_settings(
+        file = "tests/io.github.seadve.test.multi.gschema.xml",
+        id = "io.github.seadve.test.multi.window-state",
+        default = false,
+        globals = false
+    )]
+    pub struct WindowStateSettings;
+
+    impl Default for WindowStateSettings {
+        fn default() -> Self {
+            Self::new("io.github.seadve.test.multi.window-state")
+        }
+    }
+
+    let window_settings = WindowStateSettings::default();
+
+    window_settings.set_is_maximized(true);
+    assert!(window_settings.is_maximized());
+
+    window_settings.set_window_width(30_000);
+    assert_eq!(window_settings.window_width(), 30_000);
+
+    window_settings.set_window_height(30_000);
+    assert_eq!(window_settings.window_height(), 30_000);
+
+    window_settings.set_window_width_64(30_000);
+    assert_eq!(window_settings.window_width_64(), 30_000);
+
+    window_settings.set_window_height_64(30_000);
+    assert_eq!(window_settings.window_height_64(), 30_000);
+}
